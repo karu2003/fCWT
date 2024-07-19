@@ -29,37 +29,30 @@ void saveTFMToFile(const std::vector<std::complex<float>>& tfm, const std::strin
         return;
     }
 
-    // Запись переменных n, f0, f1, fn в первую строку файла
     outFile << n << " " << fn << " " << f0 << " " << f1 << std::endl;
 
     for (const auto& value : tfm) {
-        outFile << value.real() << "," << value.imag() << std::endl;  // Или используйте пробел вместо std::endl для разделения значений в одной строке
+        outFile << value.real() << "," << value.imag() << std::endl;
     }
 }
 
-// Функция для генерации чирп сигнала
 std::vector<float> generate_chirp_signal(int duration_points, int sample_rate, int start_freq, int stop_freq) {
     std::vector<float> signal(duration_points);
     double t;
     for (int i = 0; i < duration_points; ++i) {
-        t = static_cast<double>(i) / sample_rate;  // Время в секундах для текущей точки
-        // Линейное изменение частоты от start_freq до stop_freq
+        t = static_cast<double>(i) / sample_rate;
         double freq = start_freq + (stop_freq - start_freq) * (t * sample_rate / duration_points);
-        // Генерация чирп сигнала
         signal[i] = std::sin(2 * M_PI * freq * t);
     }
     return signal;
 }
 
-// Функция для генерации комплексного чирп сигнала
 std::vector<std::complex<float>> generate_complex_chirp_signal(int duration_points, int sample_rate, int start_freq, int stop_freq) {
     std::vector<std::complex<float>> signal(duration_points);
     double t;
     for (int i = 0; i < duration_points; ++i) {
-        t = static_cast<double>(i) / sample_rate;  // Время в секундах для текущей точки
-        // Линейное изменение частоты от start_freq до stop_freq
+        t = static_cast<double>(i) / sample_rate;
         double freq = start_freq + (stop_freq - start_freq) * (t * sample_rate / duration_points);
-        // Генерация комплексного чирп сигнала
         signal[i] = std::complex<float>(std::cos(2 * M_PI * freq * t), std::sin(2 * M_PI * freq * t));
     }
     return signal;
@@ -82,7 +75,7 @@ int main(int argc, char* argv[]) {
     // 3000 frequencies spread logartihmically between 1 and 32 Hz
     const float f0 = 7000;
     const float f1 = 17000;
-    const int fn = 10;
+    const int fn = 200;
 
     // Define number of threads for multithreaded use
     const int nthreads = 8;
