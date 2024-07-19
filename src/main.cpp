@@ -18,8 +18,24 @@ limitations under the License.
 */
 
 #include "main.h"
+#include <fstream>
 
 using namespace std;
+
+void saveTFMToFile(const std::vector<std::complex<float>>& tfm, const std::string& filename, int n, float fn, float f0, float f1) {
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) {
+        std::cerr << "Unable to open file for writing." << std::endl;
+        return;
+    }
+
+    // Запись переменных n, f0, f1, fn в первую строку файла
+    outFile << n << " " << fn << " " << f0 << " " << f1 << std::endl;
+
+    for (const auto& value : tfm) {
+        outFile << value.real() << "," << value.imag() << std::endl;  // Или используйте пробел вместо std::endl для разделения значений в одной строке
+    }
+}
 
 int main(int argc, char * argv[]) {
     
@@ -104,6 +120,8 @@ int main(int argc, char * argv[]) {
 
     //Calculate total duration
     chrono::duration<double> elapsed = finish - start;
+
+    saveTFMToFile(tfm, "tfm.dat", n, fn, f0, f1);
     
     cout << "=== fCWT example ===" << endl;
     cout << "Calculate CWT of a 100k sample sinusodial signal using a [" << f0 << "-" << f1 << "] Hz linear frequency range and " << fn << " wavelets." << endl;
