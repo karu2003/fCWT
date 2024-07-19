@@ -68,14 +68,14 @@ int main(int argc, char* argv[]) {
     // const float f1 = 20;
     // const int fn = 200;
 
-    int n = 1000;          // signal length
+    int n = 1000;          // signal length 1000
     const int fs = 96000;  // sampling frequency
     float twopi = 2.0 * 3.1415;
 
     // 3000 frequencies spread logartihmically between 1 and 32 Hz
-    const float f0 = 7000;
-    const float f1 = 17000;
-    const int fn = 200;
+    const float f0 = 5000;
+    const float f1 = 40000;
+    const int fn = 10; //200
 
     // Define number of threads for multithreaded use
     const int nthreads = 8;
@@ -89,9 +89,9 @@ int main(int argc, char* argv[]) {
     // output: n x scales x 2 (complex numbers consist of two parts)
     std::vector<complex<float>> tfm(n * fn);
 
-    sig = generate_chirp_signal(n, fs, f0, f1);
+    sig = generate_chirp_signal(n, fs, 7000, 12000);
 
-    sigc = generate_complex_chirp_signal(n, fs, f0, f1);
+    sigc = generate_complex_chirp_signal(n, fs, 7000, 12000);
 
     // initialize with 1 Hz cosine wave
     // for (auto& el : sig) {
