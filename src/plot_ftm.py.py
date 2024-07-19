@@ -38,6 +38,6 @@ plt.yticks(ytick_positions, ytick_labels)
 
 
 plt.title("Visualization of CWT absolute values")
-plt.ylabel("Frequency")  # Меняем местами метки
-plt.xlabel("Time")  # Меняем местами метки
+plt.ylabel("Frequency")
+plt.xlabel("Time")
 plt.show()
