@@ -22,7 +22,7 @@ data = np.loadtxt(
     },
 )
 
-print(f"Параметры: n={n}, fn={fn}, f0={f0}, f1={f1}")
+print(f"Signal Options: n={n}, fn={fn}, f0={f0}, f1={f1}")
 
 data_complex = data.reshape((int(n), -1), order="F")
 
