@@ -35,14 +35,14 @@ data_complex = data.reshape((int(n), -1), order="F")
 
 data_complex_transposed = np.transpose(data_complex)
 
-data_complex_transposed = threshold_2Darray(data_complex_transposed, 0.1)
+data_complex_transposed = threshold_2Darray(data_complex_transposed, 0.3)
 
 data_max_only = np.zeros_like(data_complex_transposed)
 max_indices = np.argmax(data_complex_transposed, axis=1)
 
 for row, max_index in enumerate(max_indices):
-    # data_max_only[row, max_index] = data_complex_transposed[row, max_index]
-    data_max_only[row, max_index] = 255
+    data_max_only[row, max_index] = data_complex_transposed[row, max_index]
+    # data_max_only[row, max_index] = 255
 
 colors = ["#ffffff", "#ff0000"]
 cmap_name = "white_red"
@@ -72,22 +72,5 @@ plt.xlabel("Time")
 plt.yticks(fontsize=8)
 plt.yticks(ytick_positions, ytick_labels)
 
-plt.tight_layout()  # Автоматическая корректировка подграфиков, чтобы они не перекрывались
+plt.tight_layout()
 plt.show()
-
-# # Генерация координат x и y из индексов двумерного массива
-# y, x = np.indices(data_max_only.shape)
-
-# # Преобразование двумерных массивов координат и данных в одномерные
-# x = x.ravel()
-# y = y.ravel()
-# values = data_max_only.ravel()
-
-# # Использование plt.scatter для отображения данных
-# plt.scatter(x, y, c=values, cmap='viridis')  # c задает цвет точек, cmap - цветовую карту
-
-# plt.colorbar()  # Отображение цветовой шкалы, соответствующей значениям данных
-# plt.title('Данные в виде точек')
-# plt.xlabel('Индекс X')
-# plt.ylabel('Индекс Y')
-# plt.show()

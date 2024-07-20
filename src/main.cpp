@@ -65,26 +65,27 @@ void saveTFMToFile(const std::vector<std::complex<float>>& tfm, const std::strin
     }
 }
 
-std::vector<float> generate_chirp_signal(int duration_points, int sample_rate, int start_freq, int stop_freq) {
-    std::vector<float> signal(duration_points);
-    double t;
-    for (int i = 0; i < duration_points; ++i) {
-        t = static_cast<double>(i) / sample_rate;
-        double freq = start_freq + (stop_freq - start_freq) * (t * sample_rate / duration_points);
-        signal[i] = std::sin(2 * M_PI * freq * t);
+void generate_chirp_signal(int duration_points, int sample_rate, float start_freq, float stop_freq, float* output) {
+    float t;
+    float k = (stop_freq - start_freq) / duration_points;  // Коэффициент изменения частоты
+    for (int i = 0; i < duration_points; i++) {
+        t = (float)i / sample_rate;
+        output[i] = sin(2 * M_PI * (start_freq * t + 0.5 * k * t * t));
     }
-    return signal;
 }
 
-std::vector<std::complex<float>> generate_complex_chirp_signal(int duration_points, int sample_rate, int start_freq, int stop_freq) {
-    std::vector<std::complex<float>> signal(duration_points);
-    double t;
+void generate_complex_chirp_signal(int duration_points, int sample_rate, float start_freq, float stop_freq, std::vector<std::complex<float>>* output) {
+    output->resize(duration_points);
+    float t1 = static_cast<float>(duration_points) / sample_rate;
+    float k = (stop_freq - start_freq) / t1;
+
     for (int i = 0; i < duration_points; ++i) {
-        t = static_cast<double>(i) / sample_rate;
-        double freq = start_freq + (stop_freq - start_freq) * (t * sample_rate / duration_points);
-        signal[i] = std::complex<float>(std::cos(2 * M_PI * freq * t), std::sin(2 * M_PI * freq * t));
+        float t = static_cast<float>(i) / sample_rate;
+        float phase = 2.0f * M_PI * (start_freq * t + 0.5f * k * t * t);
+        float real_part = std::cos(phase);
+        float imag_part = std::sin(phase);
+        (*output)[i] = std::complex<float>(real_part, imag_part);
     }
-    return signal;
 }
 
 void add_noise_and_clamp(std::vector<float>& signal, float noise_amplitude) {
@@ -118,6 +119,32 @@ void add_noise_and_clamp_c(std::vector<std::complex<float>>& vec, float noise_am
     }
 }
 
+std::vector<float> generateSineSignal(int durationPoints, int sampleRate, float frequency, float amplitude = 1.0f, float phase = 0.0f) {
+    std::vector<float> signal(durationPoints);
+    float angularFrequency = 2.0f * M_PI * frequency;
+
+    for (int i = 0; i < durationPoints; ++i) {
+        float t = static_cast<float>(i) / sampleRate;
+        signal[i] = amplitude * std::sin(angularFrequency * t + phase);
+    }
+
+    return signal;
+}
+
+std::vector<std::complex<float>> generateComplexSineSignal(int durationPoints, int sampleRate, float frequency, float amplitude = 1.0f, float phase = 0.0f) {
+    std::vector<std::complex<float>> signal(durationPoints);
+    float angularFrequency = 2.0f * M_PI * frequency;
+
+    for (int i = 0; i < durationPoints; ++i) {
+        float t = static_cast<float>(i) / sampleRate;
+        float realPart = amplitude * std::cos(angularFrequency * t + phase);
+        float imagPart = amplitude * std::sin(angularFrequency * t + phase);
+        signal[i] = std::complex<float>(realPart, imagPart);
+    }
+
+    return signal;
+}
+
 int main(int argc, char* argv[]) {
     // int n = 1000; //signal length
     // const int fs = 1000; //sampling frequency
@@ -131,15 +158,19 @@ int main(int argc, char* argv[]) {
     int n = 1000;           // signal length 1000
     const int fs = 192000;  // sampling frequency 192000
     float twopi = 2.0 * 3.1415;
-    float noise = 0.5;  // noise amplitude
+    float noise = 1.0;  // noise amplitude
 
     // 3000 frequencies spread logartihmically between 1 and 32 Hz
-    const float f0 = 700;
-    const float f1 = 34000;
-    const int fn = 100;  // 200
+    const float f0 = 7000;
+    const float f1 = 17000;
+    const int fn = 20;  // 200
     int chirp_n = 500;
     const float fstart = 7000;
     const float fend = 17000;
+
+    float frequency = 17000.0f;  // Частота сигнала в Гц
+    float amplitude = 1.0f;      // Амплитуда сигнала
+    float phase = 0.0f;          // Начальная фаза сигнала в радианах
 
     // Define number of threads for multithreaded use
     const int nthreads = 8;
@@ -156,82 +187,24 @@ int main(int argc, char* argv[]) {
     std::vector<complex<float>> sigc(n);
     std::fill(std::begin(sigc), std::end(sigc), std::complex<float>(0.0, 0.0));
 
-    // // input: n complex numbers and fill with random numbers
-    // std::generate(sig.begin(), sig.end(), [&]() { return dis(gen); });
-
-    // std::generate(sigc.begin(), sigc.end(), [&]() {
-    //     return std::complex<float>(dis(gen), dis(gen));
-    // });
-
-    // input: n real numbers and fill with random numbers, clamped to [-1, 1]
-    // std::generate(sig.begin(), sig.end(), [&]() {
-    //     return std::clamp(dis(gen), -1.0, 1.0);
-    // });
-
-    // std::generate(sigc.begin(), sigc.end(), [&]() {
-    //     float realPart = std::clamp(dis(gen), -1.0, 1.0);
-    //     float imagPart = std::clamp(dis(gen), -1.0, 1.0);
-    //     return std::complex<float>(realPart, imagPart);
-    // });
-
     // output: n x scales x 2 (complex numbers consist of two parts)
     std::vector<complex<float>> tfm(n * fn);
 
     // Generate chirp signal
     std::vector<float> chirp(chirp_n);
     std::vector<complex<float>> chirpc(chirp_n);
-    chirp = generate_chirp_signal(chirp_n, fs, fstart, fend);
-    chirpc = generate_complex_chirp_signal(chirp_n, fs, fstart, fend);
+
+    // chirp = generateSineSignal(chirp_n, fs, frequency, amplitude, phase);
+    // chirpc = generateComplexSineSignal(chirp_n, fs, frequency, amplitude, phase);
+
+    generate_chirp_signal(chirp_n, fs, fstart, fend, &chirp[0]);
+    generate_complex_chirp_signal(chirp_n, fs, fstart, fend, &chirpc);
 
     std::copy(chirp.begin(), chirp.end(), sig.begin());
     std::copy(chirpc.begin(), chirpc.end(), sigc.begin());
 
-    // Sum chirp signal with noise
-    // for (size_t i = 0; i < chirp.size(); ++i) {
-    //     sig[i] += chirp[i];
-    // }
-
-    // Sum chirpc signal with noise
-    // for (size_t i = 0; i < chirpc.size(); ++i) {
-    //     sigc[i] += chirpc[i];
-    // }
-
     add_noise_and_clamp(sig, noise);
     add_noise_and_clamp_c(sigc, noise);
-
-    // Нормирование sig
-    // float max_abs_sig = *std::max_element(sig.begin(), sig.end(), [](float a, float b) {
-    //     return std::abs(a) < std::abs(b);
-    // });
-    // if (max_abs_sig != 0) {  // Проверка на ноль, чтобы избежать деления на ноль
-    //     std::transform(sig.begin(), sig.end(), sig.begin(), [max_abs_sig](float val) {
-    //         return val / max_abs_sig;
-    //     });
-    // }
-
-    // Нормирование sigc
-    // float max_abs_sigc = std::abs(*std::max_element(sigc.begin(), sigc.end(), [](std::complex<float> a, std::complex<float> b) {
-    //     return std::abs(a) < std::abs(b);
-    // }));
-    // if (max_abs_sigc != 0) {  // Проверка на ноль, чтобы избежать деления на ноль
-    //     std::transform(sigc.begin(), sigc.end(), sigc.begin(), [max_abs_sigc](std::complex<float> val) {
-    //         return val / max_abs_sigc;
-    //     });
-    // }
-
-    // Проверка вектора sig
-    bool is_normalized_sig = std::all_of(sig.begin(), sig.end(), [](float val) {
-        return std::abs(val) <= 1.0f;
-    });
-
-    // Проверка вектора sigc
-    bool is_normalized_sigc = std::all_of(sigc.begin(), sigc.end(), [](std::complex<float> val) {
-        return std::abs(val) <= 1.0f;
-    });
-
-    // Вывод результатов
-    std::cout << "Вектор sig " << (is_normalized_sig ? "нормализован" : "не нормализован") << " в диапазоне от -1 до 1.\n";
-    std::cout << "Вектор sigc " << (is_normalized_sigc ? "нормализован" : "не нормализован") << " в диапазоне от -1 до 1.\n";
 
     // initialize with 1 Hz cosine wave
     // for (auto& el : sig) {
