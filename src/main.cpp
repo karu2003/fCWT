@@ -19,8 +19,37 @@ limitations under the License.
 
 #include "main.h"
 #include <fstream>
+#include <algorithm>
+#include <random>
 
 using namespace std;
+
+void saveRealDataToFile(const std::vector<float>& data, const std::string& filename) {
+    std::ofstream outfile(filename);
+    if (!outfile.is_open()) {
+        std::cerr << "Ошибка при открытии файла для записи: " << filename << std::endl;
+        return;
+    }
+    int index = 0;
+    for (const auto& val : data) {
+        // add index to the file
+        outfile << index++ << " " << val << std::endl;
+    }
+    outfile.close();
+}
+
+void saveComplexSignalToFile(const std::vector<std::complex<float>>& sig, const std::string& filename) {
+    std::ofstream outFile(filename);
+    if (outFile.is_open()) {
+        for (size_t index = 0; index < sig.size(); ++index) {
+            outFile << index << " " << sig[index].real() << " " << sig[index].imag() << std::endl;
+        }
+        outFile.close();
+        std::cout << "Data saved to " << filename << " with index, real and imaginary parts." << std::endl;
+    } else {
+        std::cerr << "Unable to open file for writing." << std::endl;
+    }
+}
 
 void saveTFMToFile(const std::vector<std::complex<float>>& tfm, const std::string& filename, int n, float fn, float f0, float f1) {
     std::ofstream outFile(filename);
@@ -68,30 +97,59 @@ int main(int argc, char* argv[]) {
     // const float f1 = 20;
     // const int fn = 200;
 
-    int n = 1000;          // signal length 1000
-    const int fs = 96000;  // sampling frequency
+    int n = 1000;           // signal length 1000
+    const int fs = 192000;  // sampling frequency 192000
     float twopi = 2.0 * 3.1415;
 
     // 3000 frequencies spread logartihmically between 1 and 32 Hz
-    const float f0 = 5000;
-    const float f1 = 40000;
-    const int fn = 10; //200
+    const float f0 = 100;
+    const float f1 = 80000;
+    const int fn = 200;  // 200
+    int chirp_n = 500;
+    const float fstart = 7000;
+    const float fend = 17000;
 
     // Define number of threads for multithreaded use
     const int nthreads = 8;
 
     // input: n real numbers
     std::vector<float> sig(n);
+    std::fill(sig.begin(), sig.end(), 0.0f);
+
+    std::random_device rd;                 // Получаем случайное начальное число
+    std::mt19937 gen(rd());                // Инициализируем генератор случайных чисел
+    std::normal_distribution<> dis(0, 1);  // Нормальное распределение с mean = 0 и std dev = 1
+
+    std::generate(sig.begin(), sig.end(), [&]() { return dis(gen); });
 
     // input: n complex numbers
     std::vector<complex<float>> sigc(n);
+    std::fill(std::begin(sigc), std::end(sigc), std::complex<float>(0.0, 0.0));
+
+    std::generate(sigc.begin(), sigc.end(), [&]() {
+        return std::complex<float>(dis(gen), dis(gen));
+    });
 
     // output: n x scales x 2 (complex numbers consist of two parts)
     std::vector<complex<float>> tfm(n * fn);
 
-    sig = generate_chirp_signal(n, fs, 7000, 12000);
+    std::vector<float> chirp(chirp_n);
+    std::vector<complex<float>> chirpc(chirp_n);
+    chirp = generate_chirp_signal(chirp_n, fs, fstart, fend);
+    chirpc = generate_complex_chirp_signal(chirp_n, fs, fstart, fend);
 
-    sigc = generate_complex_chirp_signal(n, fs, 7000, 12000);
+    // std::copy(chirp.begin(), chirp.end(), sig.begin());
+    // std::copy(chirpc.begin(), chirpc.end(), sigc.begin());
+
+    // Суммирование chirp с sig
+    for (size_t i = 0; i < chirp.size(); ++i) {
+        sig[i] += chirp[i];
+    }
+
+    // Суммирование chirpc с sigc
+    for (size_t i = 0; i < chirpc.size(); ++i) {
+        sigc[i] += chirpc[i];
+    }
 
     // initialize with 1 Hz cosine wave
     // for (auto& el : sig) {
@@ -154,7 +212,9 @@ int main(int argc, char* argv[]) {
     // Calculate total duration
     chrono::duration<double> elapsed = finish - start;
 
-    saveTFMToFile(tfm, "tfm.dat", n, fn, f0, f1);
+    saveRealDataToFile(sig, "sig.dat");
+    saveComplexSignalToFile(sigc, "sigc.dat");
+    saveTFMToFile(tfm, "tfm.cwt", n, fn, f0, f1);
 
     cout << "=== fCWT example ===" << endl;
     cout << "Calculate CWT of a 100k sample sinusodial signal using a [" << f0 << "-" << f1 << "] Hz linear frequency range and " << fn << " wavelets." << endl;
