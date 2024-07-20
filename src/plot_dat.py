@@ -9,12 +9,6 @@ print(current_path)
 # Находим все файлы .dat в каталоге ./build/ и его подкаталогах
 dat_files = glob.glob("**/*.dat", recursive=True)
 
-# print(dat_files)
-
-# for file in dat_files:
-#     print(file)
-
-# Путь к каталогу
 directory_path = "lib/fCWT/build/"
 
 # Находим все файлы .dat в указанном каталоге

@@ -87,6 +87,37 @@ std::vector<std::complex<float>> generate_complex_chirp_signal(int duration_poin
     return signal;
 }
 
+void add_noise_and_clamp(std::vector<float>& signal, float noise_amplitude) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1, 1);  // Генерация шума с амплитудой, которая поможет избежать выхода за пределы [-1, 1]
+
+    // Наложение шума и ограничение результата диапазоном [-1, 1]
+    std::transform(signal.begin(), signal.end(), signal.begin(), [noise_amplitude, &dis, &gen](float val) {
+        float noisy_val = val + (dis(gen) * noise_amplitude);  // Добавление шума
+        return std::max(-1.0f, std::min(1.0f, noisy_val));     // Ограничение значения диапазоном [-1, 1]
+    });
+}
+
+void add_noise_and_clamp_c(std::vector<std::complex<float>>& vec, float noise_amplitude) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(-1, 1);  // Генерация шума в диапазоне [-0.5, 0.5]
+
+    for (auto& val : vec) {
+        // Добавление шума к действительной и мнимой частям
+        float realPart = val.real() + dis(gen) * noise_amplitude;
+        float imagPart = val.imag() + dis(gen) * noise_amplitude;
+
+        // Ограничение действительной и мнимой частей диапазоном [-1, 1]
+        realPart = std::max(-1.0f, std::min(1.0f, realPart));
+        imagPart = std::max(-1.0f, std::min(1.0f, imagPart));
+
+        // Обновление значения вектора
+        val = std::complex<float>(realPart, imagPart);
+    }
+}
+
 int main(int argc, char* argv[]) {
     // int n = 1000; //signal length
     // const int fs = 1000; //sampling frequency
@@ -100,11 +131,12 @@ int main(int argc, char* argv[]) {
     int n = 1000;           // signal length 1000
     const int fs = 192000;  // sampling frequency 192000
     float twopi = 2.0 * 3.1415;
+    float noise = 0.5;  // noise amplitude
 
     // 3000 frequencies spread logartihmically between 1 and 32 Hz
-    const float f0 = 100;
-    const float f1 = 80000;
-    const int fn = 200;  // 200
+    const float f0 = 700;
+    const float f1 = 34000;
+    const int fn = 100;  // 200
     int chirp_n = 500;
     const float fstart = 7000;
     const float fend = 17000;
@@ -112,44 +144,94 @@ int main(int argc, char* argv[]) {
     // Define number of threads for multithreaded use
     const int nthreads = 8;
 
-    // input: n real numbers
+    std::random_device rd;                 // Получаем случайное начальное число
+    std::mt19937 gen(rd());                // Инициализируем генератор случайных чисел
+    std::normal_distribution<> dis(0, 1);  // Нормальное распределение с mean = -1 и std dev = 1
+
+    // input: n real numbers and fill with zeros
     std::vector<float> sig(n);
     std::fill(sig.begin(), sig.end(), 0.0f);
 
-    std::random_device rd;                 // Получаем случайное начальное число
-    std::mt19937 gen(rd());                // Инициализируем генератор случайных чисел
-    std::normal_distribution<> dis(0, 1);  // Нормальное распределение с mean = 0 и std dev = 1
-
-    std::generate(sig.begin(), sig.end(), [&]() { return dis(gen); });
-
-    // input: n complex numbers
+    // input: n complex numbers and fill with zeros
     std::vector<complex<float>> sigc(n);
     std::fill(std::begin(sigc), std::end(sigc), std::complex<float>(0.0, 0.0));
 
-    std::generate(sigc.begin(), sigc.end(), [&]() {
-        return std::complex<float>(dis(gen), dis(gen));
-    });
+    // // input: n complex numbers and fill with random numbers
+    // std::generate(sig.begin(), sig.end(), [&]() { return dis(gen); });
+
+    // std::generate(sigc.begin(), sigc.end(), [&]() {
+    //     return std::complex<float>(dis(gen), dis(gen));
+    // });
+
+    // input: n real numbers and fill with random numbers, clamped to [-1, 1]
+    // std::generate(sig.begin(), sig.end(), [&]() {
+    //     return std::clamp(dis(gen), -1.0, 1.0);
+    // });
+
+    // std::generate(sigc.begin(), sigc.end(), [&]() {
+    //     float realPart = std::clamp(dis(gen), -1.0, 1.0);
+    //     float imagPart = std::clamp(dis(gen), -1.0, 1.0);
+    //     return std::complex<float>(realPart, imagPart);
+    // });
 
     // output: n x scales x 2 (complex numbers consist of two parts)
     std::vector<complex<float>> tfm(n * fn);
 
+    // Generate chirp signal
     std::vector<float> chirp(chirp_n);
     std::vector<complex<float>> chirpc(chirp_n);
     chirp = generate_chirp_signal(chirp_n, fs, fstart, fend);
     chirpc = generate_complex_chirp_signal(chirp_n, fs, fstart, fend);
 
-    // std::copy(chirp.begin(), chirp.end(), sig.begin());
-    // std::copy(chirpc.begin(), chirpc.end(), sigc.begin());
+    std::copy(chirp.begin(), chirp.end(), sig.begin());
+    std::copy(chirpc.begin(), chirpc.end(), sigc.begin());
 
-    // Суммирование chirp с sig
-    for (size_t i = 0; i < chirp.size(); ++i) {
-        sig[i] += chirp[i];
-    }
+    // Sum chirp signal with noise
+    // for (size_t i = 0; i < chirp.size(); ++i) {
+    //     sig[i] += chirp[i];
+    // }
 
-    // Суммирование chirpc с sigc
-    for (size_t i = 0; i < chirpc.size(); ++i) {
-        sigc[i] += chirpc[i];
-    }
+    // Sum chirpc signal with noise
+    // for (size_t i = 0; i < chirpc.size(); ++i) {
+    //     sigc[i] += chirpc[i];
+    // }
+
+    add_noise_and_clamp(sig, noise);
+    add_noise_and_clamp_c(sigc, noise);
+
+    // Нормирование sig
+    // float max_abs_sig = *std::max_element(sig.begin(), sig.end(), [](float a, float b) {
+    //     return std::abs(a) < std::abs(b);
+    // });
+    // if (max_abs_sig != 0) {  // Проверка на ноль, чтобы избежать деления на ноль
+    //     std::transform(sig.begin(), sig.end(), sig.begin(), [max_abs_sig](float val) {
+    //         return val / max_abs_sig;
+    //     });
+    // }
+
+    // Нормирование sigc
+    // float max_abs_sigc = std::abs(*std::max_element(sigc.begin(), sigc.end(), [](std::complex<float> a, std::complex<float> b) {
+    //     return std::abs(a) < std::abs(b);
+    // }));
+    // if (max_abs_sigc != 0) {  // Проверка на ноль, чтобы избежать деления на ноль
+    //     std::transform(sigc.begin(), sigc.end(), sigc.begin(), [max_abs_sigc](std::complex<float> val) {
+    //         return val / max_abs_sigc;
+    //     });
+    // }
+
+    // Проверка вектора sig
+    bool is_normalized_sig = std::all_of(sig.begin(), sig.end(), [](float val) {
+        return std::abs(val) <= 1.0f;
+    });
+
+    // Проверка вектора sigc
+    bool is_normalized_sigc = std::all_of(sigc.begin(), sigc.end(), [](std::complex<float> val) {
+        return std::abs(val) <= 1.0f;
+    });
+
+    // Вывод результатов
+    std::cout << "Вектор sig " << (is_normalized_sig ? "нормализован" : "не нормализован") << " в диапазоне от -1 до 1.\n";
+    std::cout << "Вектор sigc " << (is_normalized_sigc ? "нормализован" : "не нормализован") << " в диапазоне от -1 до 1.\n";
 
     // initialize with 1 Hz cosine wave
     // for (auto& el : sig) {
@@ -196,6 +278,17 @@ int main(int argc, char* argv[]) {
     // fn        - number of wavelets to generate across frequency range
     Scales scs(wavelet, FCWT_LINFREQS, fs, f0, f1, fn);
 
+    // Инициализация вектора частот
+    std::vector<float> frequencies(fn);
+
+    // Получение вектора частот
+    scs.getFrequencies(frequencies.data(), fn);
+
+    // Вывод частот
+    // for (int i = 0; i < fn; i++) {
+    //     std::cout << "Frequency " << i << ": " << frequencies[i] << " Hz\n";
+    // }
+
     // Perform a CWT
     // cwt(input, length, output, scales)
     //
@@ -214,7 +307,7 @@ int main(int argc, char* argv[]) {
 
     saveRealDataToFile(sig, "sig.dat");
     saveComplexSignalToFile(sigc, "sigc.dat");
-    saveTFMToFile(tfm, "tfm.cwt", n, fn, f0, f1);
+    saveTFMToFile(tfm, "tfm.cwt", n, fn, f0, frequencies[0]);
 
     cout << "=== fCWT example ===" << endl;
     cout << "Calculate CWT of a 100k sample sinusodial signal using a [" << f0 << "-" << f1 << "] Hz linear frequency range and " << fn << " wavelets." << endl;
