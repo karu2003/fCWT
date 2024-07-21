@@ -157,12 +157,10 @@ int main(int argc, char* argv[]) {
 
     int n = 1000;           // signal length 1000
     const int fs = 192000;  // sampling frequency 192000
-    float twopi = 2.0 * 3.1415;
     float noise = 1.0;  // noise amplitude
-
-    // 3000 frequencies spread logartihmically between 1 and 32 Hz
-    const float f0 = 7000;
-    const float f1 = 17000;
+    const float wvl = 2.0f;  // wavelet sigma
+    const float f0 = 3400;
+    const float f1 = 34000;
     const int fn = 20;  // 200
     int chirp_n = 500;
     const float fstart = 7000;
@@ -173,7 +171,7 @@ int main(int argc, char* argv[]) {
     float phase = 0.0f;          // Начальная фаза сигнала в радианах
 
     // Define number of threads for multithreaded use
-    const int nthreads = 8;
+    const int nthreads = 1; // 8
 
     std::random_device rd;                 // Получаем случайное начальное число
     std::mt19937 gen(rd());                // Инициализируем генератор случайных чисел
@@ -223,7 +221,7 @@ int main(int argc, char* argv[]) {
     Wavelet* wavelet;
 
     // Initialize a Morlet wavelet having sigma=1.0;
-    Morlet morl(2.0f);
+    Morlet morl(wvl);
     wavelet = &morl;
 
     // Other wavelets are also possible
@@ -280,7 +278,7 @@ int main(int argc, char* argv[]) {
 
     saveRealDataToFile(sig, "sig.dat");
     saveComplexSignalToFile(sigc, "sigc.dat");
-    saveTFMToFile(tfm, "tfm.cwt", n, fn, f0, frequencies[0]);
+    saveTFMToFile(tfm, "tfm.cwt", n, fn, f0, f1); //frequencies[0])
 
     cout << "=== fCWT example ===" << endl;
     cout << "Calculate CWT of a 100k sample sinusodial signal using a [" << f0 << "-" << f1 << "] Hz linear frequency range and " << fn << " wavelets." << endl;

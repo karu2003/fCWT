@@ -218,6 +218,10 @@ void Scales::calculate_linscale_array(float four_wavl, int fs, float f0, float f
 //==============================================================//
 
 void FCWT::daughter_wavelet_multiplication(fftwf_complex *input, fftwf_complex *output, float const *mother, float scale, int isize, bool imaginary, bool doublesided) {
+    // tmp_file.open("tmp_values.tmp", std::ios::out | std::ios::app);
+    std::ofstream tmp_file("tmp_values.tmp", std::ios::out | std::ios::app);  // Открытие файла для записи
+    std::ofstream wav_file("wavelet.wvl", std::ios::out | std::ios::app);     // Открытие файла для записи
+
     float isizef = ((float)(isize));
     float endpointf = fmin(isizef / 2.0, ((isizef * 2.0) / scale));
     float step = (scale / 2.0);
@@ -308,9 +312,25 @@ void FCWT::daughter_wavelet_multiplication(fftwf_complex *input, fftwf_complex *
         int start = batchsize * i;
         int end = batchsize * (i + 1);
 
+        // Запись значений start и end в файл для каждого потока/итерации
+#ifndef SINGLE_THREAD
+#pragma omp critical  // Для безопасной записи в многопоточной среде
+#endif
+        {
+            tmp_file << "Start: " << start << ", End: " << end << std::endl;
+        }
+
         for (int q1 = start; q1 < end; q1++) {
             float q = (float)q1;
             float tmp = min(maximum, step * q);
+            // Запись в файл
+#ifndef SINGLE_THREAD
+#pragma omp critical  // Для безопасной записи в многопоточной среде
+#endif
+            {
+                tmp_file << (int)tmp << std::endl;
+                wav_file << mother[(int)tmp] << std::endl;
+            }
 
             output[q1][0] = input[q1][0] * mother[(int)tmp];
             output[q1][1] = input[q1][1] * mother[(int)tmp] * (1 - 2 * imaginary);
@@ -328,7 +348,8 @@ void FCWT::daughter_wavelet_multiplication(fftwf_complex *input, fftwf_complex *
     }
 
 #endif
-
+    tmp_file.close();
+    wav_file.close();
     return;
 }
 
@@ -531,6 +552,18 @@ void FCWT::cwt(float *pinput, int psize, complex<float> *poutput, Scales *scales
     saveFFTWComplexArraysForPlot(Ihat, newsize, "Ihat_v.fft");
 
     complex<float> *out = poutput;
+
+    std::ofstream tmp_file("tmp_values.tmp", std::ofstream::out | std::ofstream::trunc);
+    if (!tmp_file.is_open()) {
+        std::cerr << "Error opening file" << std::endl;
+    }
+    tmp_file.close();
+
+    std::ofstream wav_file("wavelet.wvl", std::ofstream::out | std::ofstream::trunc);
+    if (!wav_file.is_open()) {
+        std::cerr << "Error opening file" << std::endl;
+    }
+    wav_file.close();
 
     for (int i = 0; i < scales->nscales; i++) {
         // FFT-base convolution in the frequency domain
